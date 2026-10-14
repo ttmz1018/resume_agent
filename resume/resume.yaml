@@ -1,0 +1,195 @@
+# ============================================================
+# 简历数据源（单一数据源 / Single Source of Truth）
+#
+# app/ingest.py 读取本文件后，会同时生成两套索引：
+#   1) data/resume.db   —— SQLite 结构化表，负责精确与聚合问题
+#   2) data/chroma/     —— 向量索引，负责语义检索
+#
+# 改完本文件后重新执行：python -m app.ingest
+# ============================================================
+
+profile:
+  name: 汤明哲
+  title: AI 工程师（2026 届应届生）
+  # 应届生没有全职工作经历，填 0。Agent 会据此表述为"应届毕业生"而不是"0 年经验"。
+  years_experience: 0
+  location: "舟山"                # 简历里没写意向城市，请自行补充，例如"长沙 / 深圳"
+  email: 3132636950@qq.com
+  github: "https://github.com/ttmz1018"                  # 建议补充，面试官常会点进来
+  blog: ""
+  summary: |
+    人工智能专业 2026 届本科毕业生，熟悉 Python / PyTorch 与 LangChain Agent、RAG 开发。
+    完成烟火识别（毕业设计）、简历问答 Agent、手写公式识别、推荐系统等多个项目实践，
+    注重工程化落地与可视化开发。
+  # ⚠️ 手机号默认不写入：这个 Agent 是要挂成公开链接的，公开页面上放手机号容易被爬虫抓走
+  #    变成骚扰电话/短信。招聘方通过邮箱或微信联系完全够用。
+  #    如果确实要放，取消下面这行的注释，并同步在 app/models.py 里加一个 phone 字段。
+  # phone: "15616206076"
+
+education:
+  - school: 湖南工程学院
+    major: 人工智能
+    degree: 本科
+    start_date: "2022.09"
+    end_date: "2026.06"
+    description: |
+      信息科学与工程学院。主修课程：人工智能导论、机器学习、深度学习、数据挖掘、
+      Python 程序设计、C 语言。
+
+# 应届生没有工作经历，保持为空。
+# 有实习或全职经历后，按下面格式补充（时间用 "2025.07" 这种字符串，在职可写"至今"）：
+#   - company: 公司名
+#     title: 职位
+#     start_date: "2025.07"
+#     end_date: "至今"
+#     description: 负责的工作内容
+experiences: []
+
+projects:
+  - name: 实时烟火识别系统
+    role: 毕业设计 / 独立开发
+    company: 毕业设计
+    # 简历中没有标注项目起止时间，这里留空。时间会显著影响面试官对项目的判断，
+    # 建议你补上（例如 start_date: "2025.09", end_date: "2026.04"）。
+    start_date: ""
+    end_date: ""
+    description: |
+      面向户外与工业场景的烟火实时预警需求，基于 YOLOv8n 做轻量化改造，
+      并开发可视化 Web 监测系统。
+    tech:
+      - Python
+      - PyTorch
+      - YOLOv8n
+      - CUDA
+      - Gradio
+    highlights:
+      - 以 YOLOv8n 为基线，Backbone/Neck 引入 DSConv 轻量化重构，Head 前端嵌入无参数注意力 SimAM，实现"算子瘦身 + 结构补偿"方案。
+      - 自建多场景烟火数据集，在 RTX 4060 上做 50 轮消融训练：推理速度 132.8 FPS，参数削减 33.75%、计算量削减 28.1%。
+      - 通过 Monkey Patching 免改框架源码加载自定义算子；用 Gradio 开发 Web 监测系统，实现图像流输入 → 毫秒级推理 → 高置信度画框渲染的闭环。
+
+  - name: 简历问答 Agent（RAG 双索引检索）
+    role: 独立开发
+    company: 个人项目
+    start_date: ""
+    end_date: ""
+    description: |
+      一个可以对话式回答"关于候选人简历"问题的 Agent，部署为公开链接挂在简历上，
+      让招聘方直接对话式了解候选人背景。
+    tech:
+      - Python
+      - LangChain
+      - FastAPI
+      - Chroma
+      - SQLite
+      - BGE-M3
+    highlights:
+      - 设计 YAML 单一数据源驱动的双索引架构：结构化数据入 SQLite、按实体切片后入 Chroma 向量库，精确查询走 SQL、语义问题走向量检索。
+      - 开发 6 个受控检索工具供 Agent 调用（5 个结构化查询 + 1 个语义检索），问答结果自带来源标记，可追溯到具体简历条目。
+      - System Prompt 限定问答边界并防越狱诱导；按 IP 做滑动窗口限流。
+      - FastAPI 提供 /api/chat 接口与移动端聊天页，环境变量配置兼容多平台部署。
+
+  - name: 多功能智能助手（LangChain Agent）
+    role: 独立开发
+    company: 个人项目
+    start_date: ""
+    end_date: ""
+    description: |
+      基于 LangChain 构建的多功能 AI 助手，支持多轮工具调用与运行时策略切换。
+    tech:
+      - Python
+      - LangChain
+      - DeepSeek API
+      - Flask
+      - Pydantic
+    highlights:
+      - 封装天气、数学、时间、货币转换、信息搜索 5 个自定义工具，支持 ReAct 多轮工具调用（白名单安全求值防注入）。
+      - 采用策略模式设计 Agent 架构，支持工具调用 / 结构化输出 / 直接回答的运行时切换；抽象基类封装模型加载与会话管理。
+      - 基于 Flask 提供 Web 聊天界面。
+
+  - name: 手写公式识别计算系统
+    role: 独立开发
+    company: 个人项目
+    start_date: ""
+    end_date: ""
+    description: |
+      把手写数学公式识别成 LaTeX 并直接完成符号计算的一体化系统。
+    tech:
+      - Python
+      - PyTorch
+      - MobileNetV2
+      - OpenCV
+      - SymPy
+      - PyQt5
+    highlights:
+      - 设计"图像增强 — 字符分割 — 模型识别 — 符号计算"四层架构；用 OpenCV + scikit-image 实现智能字符分割，准确率 92.3%。
+      - PyTorch 实现 MobileNetV2（340 万参数）识别准确率 89%，INT8 量化减少 75% 算力。
+      - 集成 SymPy 符号计算，PyQt5 手写板实时渲染。
+
+  - name: 音乐推荐系统（Agentic 开发模式协同过滤推荐）
+    role: 独立开发
+    company: 个人项目
+    start_date: ""
+    end_date: ""
+    description: |
+      基于用户行为数据的个性化音乐推荐系统，开发过程借助 AI Agent 辅助完成。
+    tech:
+      - Python
+      - Pandas
+      - NumPy
+      - SciPy
+      - Scikit-learn
+      - Scrapy
+      - Claude Code
+      - Cursor
+    highlights:
+      - 借助 AI Agent 辅助完成开发；用 Scrapy 爬取音乐社区用户行为数据，构建用户-歌曲评分矩阵。
+      - 自研基于皮尔逊相关系数的 User-CF 协同过滤算法，输出 Top-10 个性化推荐。
+      - 通过数据分批读取优化大文件的内存开销。
+
+  - name: 虚拟存储区与内存工作区（页面置换算法）
+    role: 课程实验
+    company: 课程实验
+    start_date: ""
+    end_date: ""
+    description: |
+      C 语言实现的页面置换算法对比实验。
+    tech:
+      - C 语言
+    highlights:
+      - C 语言实现 FIFO、LRU、OPT 页面置换算法与命中率计算模块（页面数组、进入队列、时间戳、未来使用预测）。
+      - 对比实验验证 OPT > LRU > FIFO 的命中率特性。
+
+skills:
+  - category: 编程语言
+    items:
+      - name: Python
+        level: 精通
+      - name: C 语言
+        level: 熟悉
+  - category: 深度学习与机器学习
+    items:
+      - name: PyTorch
+        level: 熟练
+      - name: Scikit-learn
+        level: 熟悉
+      - name: 机器学习
+        level: 熟练
+  - category: LLM / Agent
+    items:
+      - name: LangChain
+        level: 熟练
+      - name: LLM 应用开发
+        level: 熟练
+      - name: RAG 检索增强
+        level: 熟练
+  - category: 领域方向
+    items:
+      - name: 计算机视觉
+        level: 熟练
+      - name: 数据分析
+        level: 熟练
+
+awards:
+  - name: CET-4（大学英语四级）
+    date: ""
+    description: 英语等级证书。

@@ -1,0 +1,22 @@
+# 不把密钥打进镜像：线上由平台的环境变量注入
+.env
+
+# 本地生成的索引不进镜像。容器没有持久盘，索引在启动时自动重建，
+# 带上镜像反而会让简历改了但索引还是旧的
+data/
+
+# 开发相关，运行时用不到
+.idea/
+.vscode/
+.git/
+.gitignore
+scripts/
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.ipynb
+README.md
+
+# 系统垃圾文件
+.DS_Store
+Thumbs.db

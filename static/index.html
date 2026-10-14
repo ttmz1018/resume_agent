@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#1f2937">
+<title>简历问答助手</title>
+<style>
+  :root {
+    --bg: #f5f7fa;
+    --card: #ffffff;
+    --line: #e5e8ee;
+    --text: #1f2937;
+    --muted: #6b7280;
+    --brand: #2563eb;
+    --brand-soft: #eff4ff;
+    --bot-bg: #ffffff;
+    --user-bg: #2563eb;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    font-size: 15px;
+    line-height: 1.6;
+  }
+
+  /* ---------- 顶部信息 ---------- */
+  header {
+    background: var(--card);
+    border-bottom: 1px solid var(--line);
+    padding: calc(env(safe-area-inset-top) + 14px) 16px 12px;
+    flex: 0 0 auto;
+  }
+  .who { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .who h1 { font-size: 18px; margin: 0; letter-spacing: .3px; }
+  .who .title { font-size: 13px; color: var(--brand); font-weight: 600; }
+  .who .meta { font-size: 12px; color: var(--muted); }
+  .summary {
+    margin: 8px 0 0;
+    font-size: 12.5px;
+    color: var(--muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .summary.open { -webkit-line-clamp: unset; }
+  .toggle {
+    background: none; border: 0; padding: 0 0 0 4px;
+    color: var(--brand); font-size: 12px; cursor: pointer;
+  }
+
+  /* ---------- 消息区 ---------- */
+  main {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 16px 14px 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .row { display: flex; margin-bottom: 14px; }
+  .row.user { justify-content: flex-end; }
+  .bubble {
+    max-width: 84%;
+    padding: 10px 13px;
+    border-radius: 14px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    animation: pop .18s ease-out;
+  }
+  @keyframes pop { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .bot .bubble {
+    background: var(--bot-bg);
+    border: 1px solid var(--line);
+    border-top-left-radius: 4px;
+  }
+  .user .bubble {
+    background: var(--user-bg);
+    color: #fff;
+    border-top-right-radius: 4px;
+  }
+  .bubble .li { display: flex; gap: 6px; }
+  .bubble .li span:first-child { color: var(--brand); flex: 0 0 auto; }
+  .bot .bubble .li span:first-child { color: var(--brand); }
+  .user .bubble .li span:first-child { color: rgba(255,255,255,.8); }
+  .bubble strong { font-weight: 600; }
+  .bubble code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 13px;
+    background: rgba(37, 99, 235, .08);
+    color: #1d4ed8;
+    padding: 1px 5px;
+    border-radius: 5px;
+  }
+
+  /* 依据来源 */
+  .sources { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .src {
+    font-size: 11px;
+    color: var(--brand);
+    background: var(--brand-soft);
+    border-radius: 999px;
+    padding: 3px 8px;
+    white-space: nowrap;
+  }
+
+  /* 思考中 */
+  .typing { display: inline-flex; gap: 4px; align-items: center; }
+  .typing i {
+    width: 6px; height: 6px; border-radius: 50%; background: #c3cad6;
+    animation: blink 1.2s infinite;
+  }
+  .typing i:nth-child(2) { animation-delay: .2s; }
+  .typing i:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%, 60%, 100% { opacity: .3 } 30% { opacity: 1 } }
+
+  /* ---------- 建议问题 ---------- */
+  .chips { padding: 0 14px 10px; display: flex; flex-wrap: wrap; gap: 8px; flex: 0 0 auto; }
+  .chip {
+    font-size: 12.5px;
+    color: var(--brand);
+    background: var(--card);
+    border: 1px solid #d6e0f5;
+    border-radius: 999px;
+    padding: 7px 12px;
+    cursor: pointer;
+  }
+  .chip:active { background: var(--brand-soft); }
+
+  /* ---------- 输入区 ---------- */
+  footer {
+    flex: 0 0 auto;
+    background: var(--card);
+    border-top: 1px solid var(--line);
+    padding: 10px 12px calc(env(safe-area-inset-bottom) + 10px);
+    display: flex;
+    gap: 8px;
+    align-items: flex-end;
+  }
+  textarea {
+    flex: 1 1 auto;
+    resize: none;
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 10px 14px;
+    font: inherit;
+    /* 必须 >=16px：iOS Safari 在小于 16px 的输入框获得焦点时会自动放大整个页面 */
+    font-size: 16px;
+    max-height: 110px;
+    line-height: 1.4;
+    outline: none;
+    background: var(--bg);
+  }
+  textarea:focus { border-color: #b9cdf7; background: #fff; }
+  button.send {
+    flex: 0 0 auto;
+    border: 0;
+    background: var(--brand);
+    color: #fff;
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    font-size: 17px;
+    cursor: pointer;
+    display: grid; place-items: center;
+  }
+  button.send:disabled { background: #c3cad6; cursor: not-allowed; }
+  .tip { font-size: 11px; color: var(--muted); text-align: center; padding: 6px 0 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="who">
+    <h1 id="name">简历问答助手</h1>
+    <span class="title" id="title"></span>
+    <span class="meta" id="meta"></span>
+  </div>
+  <p class="summary" id="summary"></p>
+</header>
+
+<main id="chat"></main>
+<div class="chips" id="chips"></div>
+
+<footer>
+  <textarea id="input" rows="1" placeholder="问点关于这份简历的问题…"></textarea>
+  <button class="send" id="send" aria-label="发送">➤</button>
+</footer>
+
+<script>
+const chatEl = document.getElementById('chat');
+const chipsEl = document.getElementById('chips');
+const inputEl = document.getElementById('input');
+const sendEl = document.getElementById('send');
+
+// 会话 ID 存在本地，刷新页面后还能接着聊，多轮上下文才不会丢
+const KEY = 'resume_agent_session';
+let sessionId = localStorage.getItem(KEY);
+if (!sessionId) {
+  sessionId = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()));
+  localStorage.setItem(KEY, sessionId);
+}
+let busy = false;
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// 极简格式化：先转义，再支持换行、"- " 项目符号，以及模型常用的 **加粗** / `行内代码`
+// 注意顺序：必须在转义之后再做替换，否则会引入 XSS 风险
+function format(text) {
+  return escapeHtml(text).split('\n').map(line => {
+    const t = line.trim();
+    if (t.startsWith('- ') || t.startsWith('· ') || t.startsWith('• ')) {
+      return `<div class="li"><span>•</span><span>${inline(t.slice(2))}</span></div>`;
+    }
+    return inline(line);
+  }).join('<br>');
+}
+
+function inline(s) {
+  return s
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+?)`/g, '<code>$1</code>');
+}
+
+function addMessage(role, text, sources) {
+  const row = document.createElement('div');
+  row.className = `row ${role}`;
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.innerHTML = role === 'user' ? escapeHtml(text) : format(text);
+  if (sources && sources.length) {
+    const box = document.createElement('div');
+    box.className = 'sources';
+    sources.forEach(s => {
+      const tag = document.createElement('span');
+      tag.className = 'src';
+      tag.textContent = s.kind === s.title ? s.title : `${s.kind}：${s.title}`;
+      box.appendChild(tag);
+    });
+    bubble.appendChild(box);
+  }
+  row.appendChild(bubble);
+  chatEl.appendChild(row);
+  chatEl.scrollTop = chatEl.scrollHeight;
+  return bubble;
+}
+
+function addTyping() {
+  const row = document.createElement('div');
+  row.className = 'row bot';
+  row.id = 'typing';
+  row.innerHTML = '<div class="bubble"><span class="typing"><i></i><i></i><i></i></span></div>';
+  chatEl.appendChild(row);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+const removeTyping = () => document.getElementById('typing')?.remove();
+
+async function send(question) {
+  if (busy || !question.trim()) return;
+  busy = true;
+  sendEl.disabled = true;
+  addMessage('user', question.trim());
+  inputEl.value = '';
+  inputEl.style.height = 'auto';
+  addTyping();
+
+  try {
+    const resp = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: question.trim(), session_id: sessionId }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    removeTyping();
+    if (!resp.ok) {
+      addMessage('bot', data.detail || `请求失败（HTTP ${resp.status}）`);
+    } else {
+      addMessage('bot', data.answer, data.sources);
+    }
+  } catch (err) {
+    removeTyping();
+    addMessage('bot', '网络异常，请检查服务是否已启动。');
+  } finally {
+    busy = false;
+    sendEl.disabled = false;
+    inputEl.focus();
+  }
+}
+
+async function loadProfile() {
+  try {
+    const resp = await fetch('/api/profile');
+    if (!resp.ok) { showGreeting(); return; }
+    const p = await resp.json();
+    document.getElementById('name').textContent = p.name || '简历问答助手';
+    document.getElementById('title').textContent = p.title || '';
+    // 应届生（years_experience=0）也要有信息展示，不能整块留空
+    const meta = [];
+    meta.push(p.years_experience ? `${p.years_experience} 年经验` : '应届生');
+    if (p.location) meta.push(p.location);
+    document.getElementById('meta').textContent = meta.join(' · ');
+    const summary = document.getElementById('summary');
+    summary.textContent = p.summary || '';
+    if ((p.summary || '').length > 60) {
+      const btn = document.createElement('button');
+      btn.className = 'toggle';
+      btn.textContent = '展开';
+      btn.onclick = () => {
+        summary.classList.toggle('open');
+        btn.textContent = summary.classList.contains('open') ? '收起' : '展开';
+      };
+      summary.after(btn);
+    }
+    (p.suggestions || []).forEach(q => {
+      const chip = document.createElement('span');
+      chip.className = 'chip';
+      chip.textContent = q;
+      chip.onclick = () => send(q);
+      chipsEl.appendChild(chip);
+    });
+    showGreeting();
+  } catch (e) {
+    showGreeting();
+  }
+}
+
+function showGreeting() {
+  addMessage('bot', '你好，我是这份简历的问答助手。\n关于候选人的工作经历、项目经验、技术栈，都可以直接问我。');
+}
+
+// 输入框自适应高度
+inputEl.addEventListener('input', () => {
+  inputEl.style.height = 'auto';
+  inputEl.style.height = Math.min(inputEl.scrollHeight, 110) + 'px';
+});
+
+// 回车发送（移动端键盘的换行键也能直接发）
+inputEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    send(inputEl.value);
+  }
+});
+sendEl.addEventListener('click', () => send(inputEl.value));
+
+loadProfile();
+</script>
+</body>
+</html>
