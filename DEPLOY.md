@@ -1,172 +1,195 @@
-# 部署指南（Zeabur）
+# 部署指南（香港轻量服务器）
 
-目标：拿到一个 **`https://xxx.zeabur.app` 的 HTTPS 链接**，挂在简历上给招聘方点。
+目标：拿到一个 **`https://你的域名`** 的 HTTPS 链接，挂在简历上给招聘方点。
 
-Zeabur 会自动检测根目录的 `Dockerfile` 并构建，所以部署本身不需要写配置文件，
-真正需要小心的是**环境变量**和**端口**这两件事。
+## 为什么选香港轻量服务器
+
+先把选型结论放前面，省得你重复踩坑：
+
+| 方案 | 结论 |
+|---|---|
+| ~~Hugging Face Spaces~~ | `huggingface.co` 国内被 DNS 污染，Spaces 网页 demo 打不开。**不能用作简历主链接** |
+| ~~Zeabur 免费档~~ | 2025 年 3 月起所有区域都改为需 Dev Plan（$5/月），免费档不再提供计算资源 |
+| ~~Render / Koyeb / Fly.io~~ | 或需绑卡、或已取消免费；且域名在国内访问不稳、还会休眠（冷启动 30-60 秒） |
+| **香港轻量服务器** | ✅ 免备案、国内延迟 30-50ms、**常驻不休眠**、成本 ≈¥24-46/月 |
+
+**核心判断**：免费的海外平台都有"冷启动 + 国内访问不稳"这两个毛病，而这恰恰是挂在简历上的链接最不能有的。招聘方点开转半天圈就会关掉。
 
 ---
 
-## 一、前置：把代码推到 GitHub
+## 一、前置准备
 
-Zeabur 支持从 GitHub 仓库部署（也支持 CLI，但网页端更直观）。当前这个项目还不是 Git 仓库：
+### 1. 买服务器
 
-```bash
-cd D:/langchain1.2_tutorial/resume_agent
+阿里云或腾讯云，**轻量应用服务器**，地域选**中国香港**。
 
-git init
-git add .
-git commit -m "feat: 简历问答 Agent（RAG 双索引 + Agent 编排）"
+- **配置**：2 核 2G 足够（实测应用只占 **180MB** 内存；选 2G 主要是为了在服务器上构建镜像时更稳）
+- **系统镜像**：Ubuntu 22.04 或 Debian 12
+- **⚠️ 阿里云选型注意**：要选「通用型 / CPU 优化型」，**不要选「国际型 BGP_NCO」**——那个线路大陆访问很慢。腾讯云香港轻量的去程 CMI 线路对大陆较友好
+- **安全组 / 防火墙**：放行 `22`(SSH)、`80`、`443`。**不要放行 8080**
+- **不需要 ICP 备案**（香港节点不在工信部备案管辖范围）。但购买要**实名认证**
 
-# 在 GitHub 上新建一个空仓库（不要勾选 README/.gitignore），然后：
-git remote add origin https://github.com/ttmz1018/<仓库名>.git
-git branch -M main
-git push -u origin main
+### 2. 买域名并解析
+
+任意注册商都行（阿里云、腾讯云、Namecheap…），`.top` / `.xyz` 一年几十块。
+
+在 DNS 控制台加一条 **A 记录**，把域名（或子域）指向服务器公网 IP：
+
+```
+类型: A    主机记录: resume    记录值: <服务器公网IP>
 ```
 
-**提交前确认 `.env` 没有被提交**（`.gitignore` 里已经排除了）：
+解析生效通常几分钟。**生效后再启动 Caddy**，否则证书签不下来：
 
 ```bash
-python -m scripts.check_secrets
+# 在你自己电脑上执行，能返回服务器 IP 就说明生效了
+nslookup resume.你的域名.com
 ```
 
-这个脚本会做两件事：确认 `.env` 未被 git 跟踪，以及扫描所有待提交文件里有没有混入真实密钥。
-最后打印 `✅ 体检通过，可以安全 push` 就放心推。
-
-> 不要用 `git status | grep ".env"` 来判断——那是子串匹配，会把本该提交的
-> `.env.example` 也匹配上，白白吓自己一跳。
-
-> `.env` 里有你的 DeepSeek 和硅基流动密钥。一旦推到公开仓库就等于泄露，
-> 只能去两个平台重新生成密钥。**推送前务必确认这一条。**
+> 别用 `IP:端口` 当简历链接，很掉价。域名一年几十块，值得花。
 
 ---
 
-## 二、在 Zeabur 上创建服务
+## 二、服务器上装 Docker
 
-1. 用 GitHub 账号登录 [zeabur.com](https://zeabur.com)
-2. **Create Project** → 选一个免费区域（Free 计划只能选免费区域）
-3. **Deploy New Service** → **GitHub** → 选中刚推的仓库
-4. Zeabur 检测到 `Dockerfile` 后会自动走 Docker 构建，等构建完成
+SSH 登录服务器后执行（Docker 官方安装脚本）：
 
-## 三、配环境变量（关键步骤）
+```bash
+curl -fsSL https://get.docker.com | sh
 
-在服务的 **Variables / 环境变量** 页面添加下面这些。
+# 验证
+docker --version
+docker compose version
+```
 
-**必填**（缺了服务会启动失败并明确报错提示缺哪个）：
+**香港服务器能直连 Docker Hub 和 PyPI**，所以本地开发时用的镜像加速和 `--build-arg PIP_INDEX_URL`
+在这里都不需要，用默认的就行。
 
-| 变量 | 值 |
-|---|---|
-| `DEEPSEEK_API_KEY` | 你的 DeepSeek 密钥 |
-| `SILICONFLOW_API_KEY` | 你的硅基流动密钥 |
+---
 
-**建议也配上**（代码里有默认值，但显式写出来更可控）：
+## 三、部署
 
-| 变量 | 值 |
-|---|---|
-| `DEEPSEEK_BASE_URL` | `https://api.deepseek.com` |
-| `LLM_MODEL` | `deepseek-v4-flash` |
-| `LLM_PROVIDER` | `deepseek` |
-| `SILICONFLOW_BASE_URL` | `https://api.siliconflow.cn/v1` |
-| `EMBED_MODEL` | `openai:Pro/BAAI/bge-m3` |
-| `EMBED_DIM` | `1024` |
-| `RATE_LIMIT_PER_MINUTE` | `20` |
-| `MAX_QUESTION_CHARS` | `500` |
+```bash
+# 1. 拉代码
+git clone https://github.com/ttmz1018/resume_agent.git
+cd resume_agent
 
-**⚠️ 不要配 `PORT` 和 `HOST`**：Zeabur 会自动注入 `PORT`（Git 部署默认 `8080`），
-而 `HOST` 在镜像里已经固定为 `0.0.0.0`。手动覆盖 PORT 反而会导致平台访问不到服务。
+# 2. 配密钥（必填两项，其余按需）
+cp .env.production.example .env
+nano .env
+#    DEEPSEEK_API_KEY=<你的密钥>
+#    SILICONFLOW_API_KEY=<你的密钥>
+#    CORS_ORIGINS=https://resume.你的域名.com
 
-## 四、确认端口
+# 3. 改域名（Caddyfile 第一行）
+nano Caddyfile
+#    resume.example.com {   →   resume.你的域名.com {
 
-在服务的 **Networking / 端口** 设置里：
+# 4. 启动（首次会构建镜像，几分钟）
+docker compose up -d --build
 
-- 端口填 **8080**，类型选 **HTTP**
-- 这样 Zeabur 会自动分配 `xxx.zeabur.app` 域名并签发 TLS 证书
+# 5. 看启动日志，应出现「✅ 首次启动：已自动构建简历索引」
+docker compose logs -f app
+```
 
-访问 `https://<你的域名>/health` 应该返回：
+启动后 Caddy 会自动向 Let's Encrypt 申请证书，**几十秒内**就能用 HTTPS 访问了。
+
+---
+
+## 四、验证
+
+```bash
+# 服务器上或本地都行
+curl https://resume.你的域名.com/health
+```
+
+期望返回：
 
 ```json
 {"status":"ok","llm_model":"deepseek-v4-flash","embed_model":"openai:Pro/BAAI/bge-m3","indexed":true,"chunks":13}
 ```
 
-`indexed: true` 且 `chunks: 13` 说明索引已经自动建好了。
+`indexed: true` 且 `chunks: 13` 说明简历索引已自动建好，可以开始对话。
+
+**然后必须做这一步**：用**手机流量（4G/5G，不要连 WiFi）**打开链接，实际问一个问题。
+
+这一步比电脑上测有用得多，因为它同时验证了：域名解析、HTTPS 证书、服务器带宽、以及**招聘方所在的网络能不能访问**。
 
 ---
 
-## 五、索引是怎么来的（重要）
+## 五、日常维护
 
-容器里**没有持久盘**，`data/` 每次重启都会清空。所以索引不是打进镜像的，
-而是**服务启动时自动重建**的（`app/ingest.py` 里的 `ensure_index()`）：
+### 改了简历怎么办
 
-- 首次启动会自动完成灌库，只需要 1 次 embedding 调用，大约 1 秒
-- 代价是每次冷启动多花一点点时间，换来的是**改了 `resume/resume.yaml` 重新部署后索引一定是新的**
-  （如果把索引打进镜像，很容易出现"简历改了但 Agent 还在回答旧内容"）
-
-也就是说：**改完简历只需要重新 push，不需要做别的**。
-
----
-
-## 六、免费档的两个已知限制
-
-1. **会休眠**：免费档服务长时间无访问会自动休眠，下次请求要冷启动，第一次打开可能转几秒到几十秒。
-   招聘方点开时体验不好——这是免费档绕不开的代价，先用着，真觉得影响观感再升 Dev（$5/月）或换香港轻量服务器。
-2. **日志只保留 48 小时**，排障要趁早看。
-
-> 关于"定时访问保活"：技术上可以（定时 ping `/health`），但免费档本身资源有限，
-> 且这属于灰色操作。短期试水可以用，别指望它长期稳定。
-
----
-
-## 七、本地先验证镜像再推（推荐）
-
-推之前先在本地跑一遍，避免在平台上来回试错。
-**Git Bash / PowerShell / CMD 都能执行 docker 命令**，下面写的是 bash 语法，Git Bash 里可直接粘贴。
+索引不是打进镜像的，而是**容器启动时自动重建**（一次 embedding 调用，约 1 秒）。
+所以流程是：改文件 → 推代码 → 服务器重建：
 
 ```bash
-cd D:/langchain1.2_tutorial/resume_agent
+# 本地
+#   改 resume/resume.yaml
+git add . && git commit -m "update resume" && git push
 
-# 1) 构建镜像（依赖层会被缓存，第一次约几十分钟，之后改代码重建只要几秒）
-docker build --build-arg PIP_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple -t resume-agent:local .
-
-# 2) 启动容器。密钥直接复用项目里已有的 .env，不用手打，也就不会留在命令历史里
-docker run -d --name resume-test -p 7860:7860 --env-file .env resume-agent:local
-
-# 3) 看启动日志，应出现「✅ 首次启动：已自动构建简历索引」
-docker logs resume-test
-
-# 4) 验证
-curl http://127.0.0.1:7860/health
-# 期望：{"status":"ok",...,"indexed":true,"chunks":13}
-# 浏览器打开 http://127.0.0.1:7860 可以直接对话
-
-# 5) 验证完清理
-docker rm -f resume-test
+# 服务器
+cd resume_agent && git pull && docker compose up -d --build
 ```
 
-**两个容易踩的点：**
+这样能保证索引一定是最新的，不会出现"简历改了但 Agent 还在答旧内容"。
 
-- **端口要和 `.env` 对齐**：`.env` 里是 `PORT=7860`，所以映射写 `-p 7860:7860`。
-  写成 `-p 8080:8080` 的话，容器内监听的是 7860，映射对不上，`curl` 会连不上。
-  （Zeabur 上不用管——它自己注入 `PORT=8080` 并接管端口映射。）
-- **别把密钥写进命令行**：`-e DEEPSEEK_API_KEY=sk-xxx` 会留在 shell 历史里，
-  用 `--env-file .env` 更安全，而且不用复制粘贴密钥。
+### 常用命令
 
-> Git Bash 里执行 docker 一般没问题；只有带 Linux 绝对路径的参数（例如
-> `docker exec xxx /bin/sh`）可能被 MSYS 路径转换搞坏，那种情况在前面加
-> `MSYS_NO_PATHCONV=1`。上面这些命令不涉及。
->
-> 补充：这一步其实**已经在你的机器上跑过了**——镜像 `resume-agent:local` 已构建，
-> 容器内问答、拒答、多轮、健康检查全部验证通过。只有当你改了代码、
-> 想在推之前再确认一次时才需要重跑。
+```bash
+docker compose ps                        # 服务状态
+docker compose logs -f --tail=100 app    # 看应用日志
+docker compose logs caddy | grep -i cert # 看证书申请/续期情况
+docker compose restart app               # 重启应用
+docker compose up -d --build             # 更新代码后重新部署
+```
+
+**证书**：Caddy 自动申请并自动续期，不需要任何操作。证书存放在 `caddy_data` 卷里——
+**这个卷别删**，删了会重新申请，而 Let's Encrypt 有颁发频率限制。
 
 ---
 
-## 八、换平台的差异（备查）
+## 六、成本
 
-代码已经做到"换平台只改环境变量，不改代码"，各平台差异只在这几处：
+| 项目 | 费用 |
+|---|---|
+| 香港轻量服务器 2核2G | ≈ ¥24-46/月（新用户活动价更低） |
+| 域名 | ≈ ¥30-70/年 |
+| DeepSeek + 硅基流动 API | 按量，个人使用量级基本可忽略 |
+| **合计** | **≈ ¥350-600/年** |
+
+一年几百块换"面试官一定打得开"，我认为比省这笔钱值。
+
+---
+
+## 七、常见问题
+
+| 现象 | 原因与排查 |
+|---|---|
+| 证书签不下来 / 一直 HTTP | ① 域名解析没生效 ② 安全组没放行 80 端口。`docker compose logs caddy` 会写明原因 |
+| 502 Bad Gateway | app 容器没起来。`docker compose logs app` 看报错；多半是 `.env` 里密钥没填对 |
+| 启动报缺少环境变量 | `.env` 里 `DEEPSEEK_API_KEY` / `SILICONFLOW_API_KEY` 没填。服务启动时会明确报缺哪个 |
+| 打开很慢 | 先看服务器带宽是否被占满；页面首屏只有 11KB，正常应该秒开 |
+| 担心额度被刷 | `.env` 里调小 `RATE_LIMIT_PER_MINUTE`；`.env.example` 已默认开启按 IP 限流 |
+| 构建很慢 | 香港服务器直连 Docker Hub 和 PyPI，正常几分钟。慢通常是服务器配置过低 |
+
+### 安全建议
+
+- 安全组**只开 22 / 80 / 443**，应用端口 8080 只在 Docker 内部网络暴露（compose 里已这样配好）
+- `CORS_ORIGINS` 收紧成自己的域名，别用 `*`
+- `.env` 不要提交到 git（推送前跑 `python -m scripts.check_secrets`）
+- 可选加固：SSH 改端口 / 禁用密码登录改密钥、开启 BBR 加速
+
+---
+
+## 附：其他平台的适配方式
+
+代码已做到"换平台只改环境变量，不改代码"：
 
 | 平台 | 需要改动 |
 |---|---|
-| **Zeabur** | 无（当前配置就是按它配的） |
-| **Hugging Face Spaces** | 环境变量加 `PORT=7860`，Space 设置里端口填 `7860` |
-| **香港/大陆轻量服务器** | `docker run -p 80:8080` + 前面挂 Caddy/Nginx 自动签 HTTPS |
-| **国内云函数** | 需改造：`data/` 没有持久盘，Chroma 要换成轻量向量检索（当前只有 13 个切片，numpy 手写余弦足够且冷启动快得多），FastAPI 改成函数入口 |
+| **香港/大陆轻量服务器** | 无（当前配置就是这个） |
+| Hugging Face Spaces | 环境变量加 `PORT=7860`，Space 端口设 `7860` |
+| Zeabur（Dev Plan） | 删掉 compose，让它直接用 Dockerfile；不要配 `PORT` / `HOST` |
+| 国内云函数 | 需改造：`data/` 无持久盘，Chroma 要换成轻量向量检索，FastAPI 改成函数入口 |

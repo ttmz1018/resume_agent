@@ -46,6 +46,10 @@ PORT = int(os.getenv("PORT", "7860"))
 RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "20"))  # 单 IP 每分钟提问上限
 MAX_QUESTION_CHARS = int(os.getenv("MAX_QUESTION_CHARS", "500"))       # 单次提问字数上限
 
+# 允许跨域的来源。前端页面和接口同源部署，其实用不到跨域，所以生产环境
+# 建议收紧成自己的域名（多个用逗号分隔），避免别家网站直接调用你的接口。
+CORS_ORIGINS = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
+
 # ---------- 检索 ----------
 RETRIEVE_TOP_K = int(os.getenv("RETRIEVE_TOP_K", "4"))
 COLLECTION_NAME = "resume_chunks"

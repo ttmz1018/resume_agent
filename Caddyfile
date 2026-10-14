@@ -1,0 +1,23 @@
+# Caddy 配置：自动申请并续期 Let's Encrypt 证书，无需手动配置 HTTPS
+#
+# ⚠️ 把下面这行换成你自己的域名。
+#    必须满足两个条件，否则证书签不下来：
+#      1. 域名的 A 记录已经指向这台服务器的公网 IP
+#      2. 服务器的 80 和 443 端口对公网开放（安全组 / 防火墙都要放行）
+resume.example.com {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		# 这个页面不需要被搜索引擎收录，也不该出现在搜索结果里
+		X-Robots-Tag "noindex, nofollow"
+	}
+
+	reverse_proxy app:8080
+}
+
+# 想同时支持 www 子域，取消下面这段注释并把域名换成自己的：
+# www.resume.example.com {
+# 	redir https://resume.example.com{uri} permanent
+# }

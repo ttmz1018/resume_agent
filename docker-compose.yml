@@ -1,0 +1,54 @@
+# 香港轻量服务器部署：应用 + Caddy（自动申请并续期 HTTPS 证书）
+#
+# 用法（在服务器上的项目目录里执行）：
+#   1. 把域名 A 记录解析到这台服务器的公网 IP，并等解析生效
+#   2. 填好 .env（见 .env.production.example）
+#   3. docker compose up -d --build
+#
+# 架构：
+#   Caddy 对外暴露 80/443 并处理 TLS；应用只在内部网络监听 8080，
+#   不对公网发布端口，减少攻击面。
+
+services:
+  app:
+    build: .
+    image: resume-agent:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # 容器内固定监听 8080，由 Caddy 反代。
+      # 这一行会覆盖 .env 里的 PORT，所以 .env 里的 PORT 配成什么值都不影响这里。
+      PORT: "8080"
+    expose:
+      - "8080"
+    # 实测内存占用约 180MB，这里给个上限，异常时不会把整机拖垮（服务器内存小于 1G 时请调小或删掉）
+    mem_limit: 768m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # 证书和账户信息持久化：重建容器时不会重复向 Let's Encrypt 申请
+      # （Let's Encrypt 有颁发频率限制，这个卷别删）
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  caddy_data:
+  caddy_config:

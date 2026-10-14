@@ -56,10 +56,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# 本地开发放开跨域，方便用其他端口的前端直接调接口
+# 跨域配置：前端与接口同源部署时其实用不到，生产环境把 CORS_ORIGINS 收紧成自己的域名
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=config.CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )

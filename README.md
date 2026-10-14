@@ -36,6 +36,7 @@ resume/resume.yaml  ──┬──>  SQLite (data/resume.db)   结构化表：p
 resume_agent/
 ├─ app/
 │  ├─ config.py              集中配置，全部走环境变量
+│  ├─ formatting.py          共用的文本格式化（工具与切片保持同一套措辞）
 │  ├─ models.py              SQLAlchemy ORM 模型
 │  ├─ db.py                  SQLite 引擎与会话
 │  ├─ schemas.py             接口出入参模型
@@ -47,8 +48,17 @@ resume_agent/
 │     └─ tools.py            6 个检索工具
 ├─ resume/resume.yaml        简历数据源（改这里就够了）
 ├─ static/index.html         聊天页面
+├─ scripts/
+│  ├─ smoke_test.py          不启服务，直接测工具与 Agent
+│  ├─ api_test.py            HTTP 接口自测（含限流验证）
+│  └─ check_secrets.py       push 前体检：确认密钥不会进仓库
+├─ Dockerfile                镜像构建（非 root、内置健康检查）
+├─ docker-compose.yml        服务器部署：应用 + Caddy
+├─ Caddyfile                 自动申请/续期 HTTPS 证书
+├─ DEPLOY.md                 部署指南
 ├─ requirements.txt
-└─ .env.example
+├─ .env.example              本地开发环境变量模板
+└─ .env.production.example   服务器环境变量模板
 ```
 
 ## 快速开始
@@ -139,9 +149,21 @@ curl -X POST http://127.0.0.1:7860/api/chat \
 
 ## 部署
 
-完整的部署步骤见 **[DEPLOY.md](DEPLOY.md)**（Zeabur 免费档，含环境变量清单与本地验证命令）。
+完整的部署步骤见 **[DEPLOY.md](DEPLOY.md)**（香港轻量服务器 + Caddy 自动 HTTPS）。
 
-下面是要点速查。
+**为什么选香港轻量服务器**：Hugging Face Spaces 的链接国内打不开；Zeabur 免费档已于
+2025 年 3 月取消计算资源；Render 等免费平台会休眠、域名国内也不稳。免费方案都绕不开
+「冷启动 + 国内访问不稳」，而这恰恰是简历链接最不能有的问题。香港节点免备案、
+国内延迟 30-50ms、常驻不休眠。
+
+### 服务器上两条命令
+
+```bash
+cp .env.production.example .env && nano .env   # 填两个密钥和自己的域名
+docker compose up -d --build                   # 起应用 + Caddy（自动签 HTTPS）
+```
+
+Caddy 会自动申请并续期证书，无需人工干预。
 
 ### 本地先验证镜像
 
@@ -158,17 +180,16 @@ docker rm -f resume-test         # 验证完清理
 
 国内网络下如拉取基础镜像超时，需要给 Docker 配镜像加速（改 `~/.docker/daemon.json`
 的 `registry-mirrors` 后重启 Docker Desktop），或加 `--build-arg PIP_INDEX_URL=...` 加速依赖安装。
+香港服务器能直连 Docker Hub 和 PyPI，那边不需要这些。
 
 ### 要点提醒
 
-- **端口**：Hugging Face Spaces 的 Docker 应用必须监听 `7860`；Zeabur 注入的 `PORT` 默认是 `8080`。
-  代码里两种都兼容，换平台只改环境变量，不用动代码。
-- **索引**：容器环境磁盘是临时的，`data/` 每次重启都会丢，所以索引没有打进镜像，
+- **端口**：compose 里应用在内部监听 `8080`，由 Caddy 反代，**不对公网暴露**；
+  Hugging Face Spaces 则需要 `7860`。代码从环境变量读端口，换平台不用改代码。
+- **索引**：容器磁盘是临时的，`data/` 每次重启都会丢，所以索引没有打进镜像，
   而是**启动时自动重建**（`app/ingest.py` 的 `ensure_index()`，一次 embedding 调用约 1 秒）。
-  好处是改完 `resume.yaml` 重新部署后索引一定是新的。
-- **保活**：免费档在长时间无访问后会休眠，冷启动需要几十秒。
-  可以用免费监控服务定时 ping `/health`，但这属于灰色操作，别指望长期稳定。
-- **国内访问**：`huggingface.co` 在国内基本无法直连，Spaces 链接不适合作为简历上的主链接。
+  好处是改完 `resume.yaml` 重新部署后索引一定是新的。应用实测只占 **180MB** 内存。
+- **安全**：安全组只开 `22/80/443`；生产环境把 `CORS_ORIGINS` 收紧成自己的域名。
 
 ## 后续可以继续做的
 
