@@ -32,6 +32,11 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    environment:
+      # 站点地址从 .env 读取（docker compose 会自动读取项目目录下的 .env 做变量替换）。
+      # 这里用 :? 语法强制要求，没设置就直接报错退出——
+      # 否则 Caddy 会拿到一个空站点地址，签不到证书还照常启动，问题会很难查。
+      SITE_ADDRESS: ${SITE_ADDRESS:?请在 .env 里设置 SITE_ADDRESS，例如 SITE_ADDRESS=resume.example.com}
     ports:
       - "80:80"
       - "443:443"

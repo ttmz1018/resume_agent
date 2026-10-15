@@ -1,23 +1,26 @@
-# Caddy 配置：自动申请并续期 Let's Encrypt 证书，无需手动配置 HTTPS
+# Caddy 配置
 #
-# ⚠️ 把下面这行换成你自己的域名。
-#    必须满足两个条件，否则证书签不下来：
-#      1. 域名的 A 记录已经指向这台服务器的公网 IP
-#      2. 服务器的 80 和 443 端口对公网开放（安全组 / 防火墙都要放行）
-resume.example.com {
+# 站点域名从环境变量 SITE_ADDRESS 读取，不写死在这个文件里。
+#
+# 为什么要这么做：Caddyfile 是被 git 跟踪的。如果域名写死在这个文件里，
+# 服务器上改过之后，每次 git pull 都会产生冲突——而更新简历是要经常 pull 的。
+# 放到 .env（已被 .gitignore 排除）里就没有这个问题，换域名也只改一个地方。
+#
+# 在 .env 里设置 SITE_ADDRESS：
+#   SITE_ADDRESS=resume-tmz.duckdns.org    正常上线，自动申请 HTTPS 证书
+#   SITE_ADDRESS=:80                       还没有域名，临时用 IP + HTTP
+#
+# 想同时支持 www 子域，写逗号分隔的两个地址即可：
+#   SITE_ADDRESS=resume.example.com, www.resume.example.com
+{$SITE_ADDRESS} {
 	encode zstd gzip
 
 	header {
 		X-Content-Type-Options nosniff
 		Referrer-Policy strict-origin-when-cross-origin
-		# 这个页面不需要被搜索引擎收录，也不该出现在搜索结果里
+		# 这是个人简历的问答页，不需要被搜索引擎收录
 		X-Robots-Tag "noindex, nofollow"
 	}
 
 	reverse_proxy app:8080
 }
-
-# 想同时支持 www 子域，取消下面这段注释并把域名换成自己的：
-# www.resume.example.com {
-# 	redir https://resume.example.com{uri} permanent
-# }

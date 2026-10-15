@@ -74,25 +74,37 @@ docker compose version
 git clone https://github.com/ttmz1018/resume_agent.git
 cd resume_agent
 
-# 2. 配密钥（必填两项，其余按需）
+# 2. 配环境变量（只改 .env 一个文件，域名也在这里）
 cp .env.production.example .env
 nano .env
 #    DEEPSEEK_API_KEY=<你的密钥>
 #    SILICONFLOW_API_KEY=<你的密钥>
+#    SITE_ADDRESS=resume.你的域名.com          ← Caddy 用它签 HTTPS 证书
 #    CORS_ORIGINS=https://resume.你的域名.com
 
-# 3. 改域名（Caddyfile 第一行）
-nano Caddyfile
-#    resume.example.com {   →   resume.你的域名.com {
-
-# 4. 启动（首次会构建镜像，几分钟）
+# 3. 启动（首次会构建镜像，几分钟）
 docker compose up -d --build
 
-# 5. 看启动日志，应出现「✅ 首次启动：已自动构建简历索引」
+# 4. 看启动日志，应出现「✅ 首次启动：已自动构建简历索引」
 docker compose logs -f app
 ```
 
 启动后 Caddy 会自动向 Let's Encrypt 申请证书，**几十秒内**就能用 HTTPS 访问了。
+
+### 为什么域名配在 .env 而不是 Caddyfile 里
+
+`Caddyfile` 是被 git 跟踪的文件。如果把域名写死在里面，你在服务器上改完之后，
+**每次 `git pull` 都会冲突**——而更新简历是要经常 pull 的。
+
+所以域名放在 `.env` 的 `SITE_ADDRESS` 里（`.env` 已被 `.gitignore` 排除），
+`Caddyfile` 只写 `{$SITE_ADDRESS}` 引用它。好处：
+
+- `git pull` 永远不冲突
+- **换域名只改 `.env` 一个地方**，`docker compose up -d` 重启即可生效
+- 还没有域名时可以用 `SITE_ADDRESS=:80` 先跑纯 HTTP（此时端口映射改为 `-p 80:8080` 直连应用，不走 Caddy）
+
+如果 `.env` 里没设 `SITE_ADDRESS`，`docker compose up` 会**直接报错退出**并提示你设置，
+不会出现"Caddy 起来了但签不到证书"这种难排查的情况。
 
 ---
 
