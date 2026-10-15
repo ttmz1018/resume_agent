@@ -13,16 +13,17 @@ profile:
   title: AI 工程师（2026 届应届生）
   # 应届生没有全职工作经历，填 0。Agent 会据此表述为"应届毕业生"而不是"0 年经验"。
   years_experience: 0
-  location: "舟山"                # 简历里没写意向城市，请自行补充，例如"长沙 / 深圳"
+  age: 22
+  location: "舟山"
   email: 3132636950@qq.com
-  github: "https://github.com/ttmz1018"                  # 建议补充，面试官常会点进来
+  github: "https://github.com/ttmz1018"
   blog: ""
   summary: |
-    人工智能专业 2026 届本科毕业生，熟悉 Python / PyTorch 与 LangChain Agent、RAG 开发。
-    完成烟火识别（毕业设计）、简历问答 Agent、手写公式识别、推荐系统等多个项目实践，
+    人工智能专业 2026 届本科毕业生，熟悉 Python / PyTorch 与 LLM 应用开发（LangChain / LangGraph / RAG）；
+    有烟火识别（毕业设计）、多 Agent 深度研究系统、简历问答 Agent、手写识别、推荐系统等多项项目实践，
     注重工程化落地与可视化开发。
   # ⚠️ 手机号默认不写入：这个 Agent 是要挂成公开链接的，公开页面上放手机号容易被爬虫抓走
-  #    变成骚扰电话/短信。招聘方通过邮箱或微信联系完全够用。
+  #    变成骚扰电话/短信。招聘方通过邮箱或 GitHub 联系完全够用。
   #    如果确实要放，取消下面这行的注释，并同步在 app/models.py 里加一个 phone 字段。
   # phone: "15616206076"
 
@@ -67,6 +68,27 @@ projects:
       - 自建多场景烟火数据集，在 RTX 4060 上做 50 轮消融训练：推理速度 132.8 FPS，参数削减 33.75%、计算量削减 28.1%。
       - 通过 Monkey Patching 免改框架源码加载自定义算子；用 Gradio 开发 Web 监测系统，实现图像流输入 → 毫秒级推理 → 高置信度画框渲染的闭环。
 
+  - name: 多 Agent 深度研究系统（LangGraph 单模型多角色）
+    role: 独立开发
+    company: 个人项目
+    start_date: ""
+    end_date: ""
+    description: |
+      基于 LangGraph 的单模型多 Agent 协作系统：输入一个研究主题，
+      自动完成调研、分析与撰稿，5-8 分钟产出带可点击引用的中文研究报告。
+    tech:
+      - Python
+      - LangGraph
+      - DeepSeek
+      - Tavily
+      - LangSmith
+      - loguru
+    highlights:
+      - 基于 LangGraph 构建单模型多 Agent 协作系统（协调 / 规划 / 研究 / 分析 / 撰稿 5 个角色），各角色独立提示词与工具集，由运行时状态动态路由委派，实现上下文隔离与共享状态传递。
+      - 引用可追溯：校验并回填截断 URL、剔除编造链接，报告清单与正文严格对应（约 11 条可点击引用）。
+      - loguru 日志 + LangSmith 全链路跟踪支持每步复盘；含预调研、重规划限流、失败降级不中断等容错设计。
+      - 5-8 分钟自动产出中文研究报告。
+
   - name: 简历问答 Agent（RAG 双索引检索）
     role: 独立开发
     company: 个人项目
@@ -103,7 +125,7 @@ projects:
       - Pydantic
     highlights:
       - 封装天气、数学、时间、货币转换、信息搜索 5 个自定义工具，支持 ReAct 多轮工具调用（白名单安全求值防注入）。
-      - 采用策略模式设计 Agent 架构，支持工具调用 / 结构化输出 / 直接回答的运行时切换；抽象基类封装模型加载与会话管理。
+      - 采用策略模式设计 Agent 架构（工具调用 / 结构化输出 / 直接回答的运行时切换），抽象基类封装模型加载与会话管理。
       - 基于 Flask 提供 Web 聊天界面。
 
   - name: 手写公式识别计算系统
@@ -121,8 +143,8 @@ projects:
       - SymPy
       - PyQt5
     highlights:
-      - 设计"图像增强 — 字符分割 — 模型识别 — 符号计算"四层架构；用 OpenCV + scikit-image 实现智能字符分割，准确率 92.3%。
-      - PyTorch 实现 MobileNetV2（340 万参数）识别准确率 89%，INT8 量化减少 75% 算力。
+      - 设计"图像增强 — 字符分割 — 模型识别 — 符号计算"四层架构，用 OpenCV + scikit-image 实现智能字符分割，准确率 92.3%。
+      - MobileNetV2 识别准确率 89%，INT8 量化减少 75% 算力。
       - 集成 SymPy 符号计算，PyQt5 手写板实时渲染。
 
   - name: 音乐推荐系统（Agentic 开发模式协同过滤推荐）
@@ -142,7 +164,7 @@ projects:
       - Claude Code
       - Cursor
     highlights:
-      - 借助 AI Agent 辅助完成开发；用 Scrapy 爬取音乐社区用户行为数据，构建用户-歌曲评分矩阵。
+      - 采用 Agentic 模式辅助开发；用 Scrapy 爬取音乐社区用户行为数据，构建用户-歌曲评分矩阵。
       - 自研基于皮尔逊相关系数的 User-CF 协同过滤算法，输出 Top-10 个性化推荐。
       - 通过数据分批读取优化大文件的内存开销。
 
@@ -178,9 +200,13 @@ skills:
     items:
       - name: LangChain
         level: 熟练
+      - name: LangGraph
+        level: 熟练
       - name: LLM 应用开发
         level: 熟练
       - name: RAG 检索增强
+        level: 熟练
+      - name: 多 Agent 协作编排
         level: 熟练
   - category: 领域方向
     items:

@@ -61,6 +61,7 @@ def write_sqlite(resume: dict[str, Any]) -> None:
                 name=profile.get("name", ""),
                 title=profile.get("title", ""),
                 years_experience=int(profile.get("years_experience", 0) or 0),
+                age=int(profile.get("age", 0) or 0),
                 location=profile.get("location", ""),
                 email=profile.get("email", ""),
                 github=profile.get("github", ""),
@@ -151,6 +152,8 @@ def build_chunks(resume: dict[str, Any]) -> list[Document]:
         f"求职意向：{title}",
         experience_label(int(profile.get("years_experience", 0) or 0)),
     ]
+    if profile.get("age"):
+        profile_lines.append(f"年龄：{profile['age']} 岁")
     if profile.get("location"):
         profile_lines.append(f"所在城市：{profile['location']}")
     if profile.get("email"):

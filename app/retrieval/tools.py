@@ -45,6 +45,8 @@ def get_basic_profile() -> str:
             f"求职意向：{profile.title}",
             _experience_label(profile.years_experience),
         ]
+        if profile.age:
+            lines.append(f"年龄：{profile.age} 岁")
         if profile.location:
             lines.append(f"所在城市：{profile.location}")
         if profile.email:

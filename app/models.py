@@ -29,6 +29,7 @@ class Profile(Base):
     name: Mapped[str] = mapped_column(String(64))
     title: Mapped[str] = mapped_column(String(128), default="")        # 求职意向 / 当前职位
     years_experience: Mapped[int] = mapped_column(Integer, default=0)  # 工作年限
+    age: Mapped[int] = mapped_column(Integer, default=0)               # 年龄，0 表示未填
     location: Mapped[str] = mapped_column(String(64), default="")
     email: Mapped[str] = mapped_column(String(128), default="")
     github: Mapped[str] = mapped_column(String(128), default="")
